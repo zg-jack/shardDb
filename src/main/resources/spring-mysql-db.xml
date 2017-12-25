@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:oxm="http://www.springframework.org/schema/oxm"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="
+    http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+    http://www.springframework.org/schema/context
+    http://www.springframework.org/schema/context/spring-context-3.2.xsd
+    http://www.springframework.org/schema/mvc
+    http://www.springframework.org/schema/mvc/spring-mvc-3.2.xsd
+    http://www.springframework.org/schema/oxm     http://www.springframework.org/schema/oxm/spring-oxm-3.2.xsd
+    http://www.springframework.org/schema/tx      http://www.springframework.org/schema/tx/spring-tx-3.2.xsd
+    http://www.springframework.org/schema/aop     http://www.springframework.org/schema/aop/spring-aop-3.2.xsd
+    ">
+	<bean id="configurer"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath*:mysql.properties</value>
+			</list>
+		</property>
+	</bean>
+
+	<!--数据源 写 -->
+	<bean id="dataSourceW" class="org.apache.commons.dbcp.BasicDataSource"
+		destroy-method="close">
+		<property name="driverClassName">
+			<value>com.mysql.jdbc.Driver</value>
+		</property>
+		<property name="url">
+			<value>${jdbc.url.write}</value>
+		</property>
+		<property name="username">
+			<value>${jdbc.user.write}</value>
+		</property>
+		<property name="password">
+			<value>${jdbc.password.write}</value>
+		</property>
+		<property name="validationQuery">
+			<value>SELECT 1 FROM DUAL</value>
+		</property>
+		<property name="initialSize">
+			<value>3</value>
+		</property>
+		<property name="minIdle">
+			<value>2</value>
+		</property>
+		<property name="maxIdle">
+			<value>5</value>
+		</property>
+		<property name="maxActive">
+			<value>100</value>
+		</property>
+		<property name="maxWait">
+			<value>10000</value>
+		</property>
+		<property name="removeAbandoned">
+			<value>true</value>
+		</property>
+		<property name="removeAbandonedTimeout">
+			<value>60</value>
+		</property>
+	</bean>
+
+	<!--数据源 读 -->
+	<bean id="dataSourceR" class="org.apache.commons.dbcp.BasicDataSource"
+		destroy-method="close">
+		<property name="driverClassName">
+			<value>com.mysql.jdbc.Driver</value>
+		</property>
+		<property name="url">
+			<value>${jdbc.url.read}</value>
+		</property>
+		<property name="username">
+			<value>${jdbc.user.read}</value>
+		</property>
+		<property name="password">
+			<value>${jdbc.password.read}</value>
+		</property>
+		<property name="validationQuery">
+			<value>SELECT 1 FROM DUAL</value>
+		</property>
+		<property name="initialSize">
+			<value>3</value>
+		</property>
+		<property name="minIdle">
+			<value>2</value>
+		</property>
+		<property name="maxIdle">
+			<value>5</value>
+		</property>
+		<property name="maxActive">
+			<value>100</value>
+		</property>
+		<property name="maxWait">
+			<value>10000</value>
+		</property>
+		<property name="removeAbandoned">
+			<value>true</value>
+		</property>
+		<property name="removeAbandonedTimeout">
+			<value>60</value>
+		</property>
+	</bean>
+
+	<!-- 这个是spring的动态数据源切换的配置  class需要配置获取数据源字符串的类该类必须继承spring的AbstractRoutingDataSource类-->
+	<bean id="dynamicDataSource" class="com.zhuguang.jack.dynamicDataSource.DynamicDataSource">
+		<property name="targetDataSources">
+			<map key-type="java.lang.String">
+				<entry key="write" value-ref="dataSourceW" />
+				<entry key="read" value-ref="dataSourceR" />
+			</map>
+		</property>
+		<property name="defaultTargetDataSource" ref="dataSourceW" />
+	</bean>
+
+	<!--mybatis与Spring整合 开始 -->
+	<bean id="sqlSessionFactory" name="sqlSessionFactory"
+		class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="mapperLocations">
+			<value>classpath*:com/zhuguang/jack/xml/*.xml</value>
+		</property>
+		<property name="typeAliasesPackage" value="com.zhuguang.jack.vo" />
+		<property name="dataSource" ref="dynamicDataSource" />
+	</bean>
+
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="com.zhuguang.jack.dao" />
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+	</bean>
+
+	<!-- 事务管理器配置,单数据源事务 -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dynamicDataSource" />
+	</bean>
+	<!-- 切面类，在调用服务层方法之前动态的改变数据源 -->
+	<bean id="dataSourceAspectJ" class="com.zhuguang.jack.dynamicDataSource.DataSourceAspectJ"></bean>
+
+	<!-- 使用annotation定义事务 -->
+	<tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true" />
+
+	<context:component-scan base-package="com.zhuguang.jack" />
+
+	<aop:aspectj-autoproxy />
+	
+</beans>
